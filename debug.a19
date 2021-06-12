@@ -1,0 +1,216 @@
+CONST	VRAM		0xFB65
+CONST	VATTRIBUTES	0xFFFD
+CONST	GAMEPADS	0xFFFF
+
+CONST	SCREEN_WIDTH	671
+CONST	SCREEN_HEIGHT	447
+
+CONST	GRAVITY		1
+CONST	FINENESS	16
+CONST	WALK_SPEED	8
+CONST	JUMP_SPEED	-16
+
+SET		SP f_stack
+SET		VP v_stack
+SET		VATTRIBUTES 0x0019
+JMP		Main
+
+MARK	f_stack
+	DATA	0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+MARK	v_stack
+	DATA	0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+
+; Data
+MARK	pl_x
+	DATA	168
+MARK	pl_y
+	DATA	112
+MARK	pl_spr_x
+	DATA	0
+MARK	pl_spr_y
+	DATA	0
+MARK	pl_spr
+	DATA	0x1F02
+MARK	pl_vel_x
+	DATA	0
+MARK	pl_vel_y
+	DATA	0
+
+MARK	Main
+	CALL	Player_Move
+	CALL	Player_Draw
+	
+	GET		pl_spr_x A
+	ADD		A 0x0200
+	SET		VRAM A
+	
+	SET		A VRAM
+	GET		pl_vel_y B
+	ADD		B 0x0200
+	SET		[A+1] B
+	
+	JMP		VSync
+	
+MARK	VSync
+	; Clear VBlank bit
+	AND		VATTRIBUTES 0xFF7F
+	
+	MARK	VSync.loop
+		GET		VATTRIBUTES T
+		AND		T 0x80
+		
+		JE		VSync.loop
+		JMP		Main
+	
+MARK	Player_Move
+	CALL	Get_Input
+	
+	MARK	Player_Move.Vert
+		VPOP	A; Up
+		VPOP	B; Down
+		
+		SET		T A; If Up isn't pressed,
+		JE		Player_Move.Horiz
+		
+		CMP		pl_y SCREEN_HEIGHT
+		JNE		Player_Move.Horiz; Or if we're not on the ground, we're skipping the jump code.
+		
+		SET		pl_vel_y JUMP_SPEED
+	
+	MARK	Player_Move.Horiz
+		VPOP	A; Left
+		VPOP	B; Right
+		
+		CMP		A B; If the horizontal buttons are the same, we're not going anywhere.
+		JE		Player_Move.Phys
+		
+		SET		T A; Otherwise, if Left isn't pressed, we're going right.
+		JE		Player_Move.Horizontal_Right
+		
+		SUB		pl_x WALK_SPEED; Move it.
+		
+		GET		pl_x T; If we're still to the right of 0
+		JNL		Player_Move.Phys; Finish.
+		SET		A pl_x
+		SET		[A] 0; Otherwise, we'll bump the player back to the right.
+		
+		JMP		Player_Move.Phys
+		
+	MARK	Player_Move.Horizontal_Right
+		ADD		pl_x WALK_SPEED; Move it.
+		
+		CMP		pl_x SCREEN_WIDTH; If we're still to the left of SCREEN_WIDTH
+		JL		Player_Move.Phys; Finish.
+		SET		A pl_x
+		SET		[A] SCREEN_WIDTH; Otherwise, we'll bump the player back to the left.
+		
+	MARK	Player_Move.Phys
+		GET		pl_y A
+		GET		pl_vel_y B
+		ADD		A B
+		SET		C pl_y
+		SET		[C] A
+		
+		ADD		B GRAVITY
+		SET		C pl_vel_y
+		SET		[C] B
+	
+	MARK	Player_Move.V_Clamp_Down
+		CMP		pl_y SCREEN_HEIGHT; If we're still above SCREEN_HEIGHT
+		JL		Player_Move.V_Clamp_Up; Move on to the up check.
+		
+		SET		A pl_y
+		SET		[A] SCREEN_HEIGHT; Otherwise, we'll bump the player back up.
+		
+		SET		A pl_vel_y
+		SET		[A] 0; And set their vertical velocity to 0.
+		
+	MARK	Player_Move.V_Clamp_Up
+		GET		pl_y T; If we're still below 0
+		JNL		Player_Move.Return; Move on to the horizontal check.
+		
+		SET		A pl_y
+		SET		[A] 0; Otherwise, we'll bump the player back down.
+		
+		SET		A pl_vel_y
+		SET		[A] 0; And set their vertical velocity to 0.
+	
+	MARK	Player_Move.Return
+		RET
+
+MARK	Player_Draw
+	GET		pl_x A
+	GET		pl_spr_x B
+	CMP		A B
+	
+	JNE		Player_Draw.Update; Update if player moved laterally
+	
+	MARK	Play_Draw.Vert_Check
+		GET		pl_y A
+		GET		pl_spr_y B
+		CMP		A B
+		JE		Player_Draw.Return; Skip update if player did not move vertically
+	
+	MARK	Player_Draw.Update
+		; Clear character
+		GET		pl_spr_x A
+		DIV		A FINENESS
+		VPUSH	A
+		GET		pl_spr_y A
+		DIV		A FINENESS
+		VPUSH	A
+		VPUSH	0x0000
+		CALL	Set_Character
+		
+		; Place new character
+		GET		pl_x A
+		SET		pl_spr_x A
+		DIV		A FINENESS
+		VPUSH	A
+		GET		pl_y A
+		SET		pl_spr_y A
+		DIV		A FINENESS
+		VPUSH	A
+		GET		pl_spr A
+		VPUSH	A
+		
+		CALL	Set_Character
+	
+	MARK	Player_Draw.Return
+		RET
+
+MARK	Set_Character
+	VPOP		C; Character
+	VPOP		B; Y
+	VPOP		A; X
+	
+	ADD		A VRAM
+	MUL		B 42
+	ADD		A B
+	
+	SET		[A] C
+	
+	RET
+
+MARK	Get_Input
+	SET		A GAMEPADS
+	
+	GET		[A] B; Right
+	AND		B 0x80
+	SHR		B 7
+	VPUSH	B
+	GET		[A] B; Left
+	AND		B 0x40
+	SHR		B 6
+	VPUSH	B
+	GET		[A] B; Down
+	AND		B 0x20
+	SHR		B 5
+	VPUSH	B
+	GET		[A] B; Up
+	AND		B 0x10
+	SHR		B 4
+	VPUSH	B
+	
+	
+	RET
