@@ -51,7 +51,7 @@ fn main() {
 		encoded_file.push(value as u8)
 	};
 	
-	let output_path = format!("{}{}.bin", path.parent().unwrap().to_str().unwrap(), path.file_stem().unwrap().to_str().unwrap());
+	let output_path = format!("{}\\{}.bin", path.parent().unwrap().to_str().unwrap(), path.file_stem().unwrap().to_str().unwrap());
 	
 	fs::write(output_path, &encoded_file).unwrap();
 }
