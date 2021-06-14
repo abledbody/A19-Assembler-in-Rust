@@ -118,7 +118,7 @@ pub enum Token {
 	#[error]
 	Error,
 	
-	#[regex("[ \t\n]+", logos::skip)]
+	#[regex("[ \t\n\r]+", logos::skip)]
 	Whitespace,
 	
 	#[regex(";.*", logos::skip)]
@@ -159,11 +159,11 @@ pub enum Token {
 	Identifier,
 }
 
-pub fn print_all(stdout: &mut StandardStream, data: &str) {
+pub fn print_all(stdout: &mut StandardStream, data: &str, hold: bool) {
 	let mut lex = Token::lexer(&data);
 	
 	'lexing: loop {
-		for _ in 0..20 {
+		for _ in 0..30 {
 			let token = match lex.next() {
 				Some(token) => token,
 				None => {
@@ -191,7 +191,7 @@ pub fn print_all(stdout: &mut StandardStream, data: &str) {
 			
 			write!(stdout, "{}\t", token_display(&lex, &token)).unwrap();
 		}
-		std::io::stdin().read_line(&mut "".to_owned()).unwrap();
+		if hold {std::io::stdin().read_line(&mut "".to_owned()).unwrap();}
 	}
 	stdout.set_color(ColorSpec::new().set_fg(Some(Color::White))).unwrap();
 }
@@ -199,6 +199,7 @@ pub fn print_all(stdout: &mut StandardStream, data: &str) {
 pub fn token_display(lex: &Lexer<Token>, token: &Token) -> String {
 	let string = match token {
 		Token::Keyword(_) => "\n",
+		Token::Error => panic!(" <There's an invalid token here!> "),
 		_ => ""
 	};
 	format!("{}{}", string, lex.slice())

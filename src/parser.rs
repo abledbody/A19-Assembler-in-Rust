@@ -78,16 +78,13 @@ pub enum FromMem {
 pub fn parse(lex: &mut Lexer<Token>) -> Option<Instruction> {
 	let token = lex.next();
 	let instruction = match token {
-		Some(token) =>
-			Some(
-				match token {
-					Token::Keyword(keyword) => {
-						let instruction = match_keyword(lex, keyword);
-						instruction
-					},
-					_ => panic!("Unexpected token: {:?}", token)
-				}
-			),
+		Some(token) => match token {
+				Token::Keyword(keyword) => {
+					let instruction = match_keyword(lex, keyword);
+					Some(instruction)
+				},
+				_ => panic!("Unexpected token: {:?}", token)
+			},
 		None => None
 	};
 	

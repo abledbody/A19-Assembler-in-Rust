@@ -22,7 +22,7 @@ fn main() {
 	
 	let mut stdout = StandardStream::stdout(ColorChoice::Always);
 	
-	lexer::print_all(&mut stdout, &data);
+	lexer::print_all(&mut stdout, &data, false);
 	
 	let mut lex = Token::lexer(&data);
 	
