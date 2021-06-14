@@ -4,7 +4,7 @@ use termcolor::{self, Color, ColorSpec, StandardStream, WriteColor};
 use crate::keywords::{Keyword, Register};
 
 
-pub fn get_register(lex: &mut Lexer<Token>) -> Option<Register> {
+fn get_register(lex: &mut Lexer<Token>) -> Option<Register> {
 	let slice =lex.slice()
 		.to_uppercase();
 	
@@ -21,7 +21,7 @@ pub fn get_register(lex: &mut Lexer<Token>) -> Option<Register> {
 	}
 }
 
-pub fn get_keyword(lex: &mut Lexer<Token>) -> Option<Keyword> {
+fn get_keyword(lex: &mut Lexer<Token>) -> Option<Keyword> {
 	let slice =lex.slice()
 		.to_uppercase();
 	
@@ -29,6 +29,7 @@ pub fn get_keyword(lex: &mut Lexer<Token>) -> Option<Keyword> {
 		"CONST"		=>	Some(Keyword::CONST),
 		"MARK"		=>	Some(Keyword::MARK),
 		"DATA"		=>	Some(Keyword::DATA),
+		"DSTR"		=>	Some(Keyword::DSTR),
 		
 		"NEG"		=>	Some(Keyword::NEG),
 		"ADD"		=>	Some(Keyword::ADD),
@@ -74,8 +75,45 @@ pub fn get_keyword(lex: &mut Lexer<Token>) -> Option<Keyword> {
 	}
 }
 
+fn get_decimal_number (lex: &mut Lexer<Token>) -> Option<u16> {
+	let string = lex.slice()
+		.replace("_", "");
+	
+	let value = u16::from_str_radix(string.as_str(), 10);
+	
+	match value {
+		Ok(value) => Some(value),
+		Err(err) => panic!("{}", err),
+	}
+}
+
+fn get_hexadecimal_number (lex: &mut Lexer<Token>) -> Option<u16> {
+	let string = &lex.slice()[2..]
+		.replace("_", "");
+	
+	let value = u16::from_str_radix(string.as_str(), 16);
+	
+	match value {
+		Ok(value) => Some(value),
+		Err(err) => panic!("{}", err),
+	}
+}
+
+fn get_binary_number (lex: &mut Lexer<Token>) -> Option<u16> {
+	let string = &lex.slice()[2..]
+		.replace("_", "");
+	
+	let value = u16::from_str_radix(string.as_str(), 2);
+	
+	match value {
+		Ok(value) => Some(value),
+		Err(err) => panic!("{}", err),
+	}
+}
+
 #[derive(Debug)]
 #[derive(Logos)]
+#[derive(Clone)]
 pub enum Token {
 	#[error]
 	Error,
@@ -86,7 +124,7 @@ pub enum Token {
 	#[regex(";.*", logos::skip)]
 	Comment,
 	
-	#[regex("(?i)((CONST)|(MARK)|(DATA))", get_keyword)]
+	#[regex("(?i)((CONST)|(MARK)|(DATA)|(DSTR))", get_keyword)]
 	#[regex("(?i)((NEG)|(ADD)|(SUB)|(MUL)|(DIV)|(MOD)|(SMUL)|(SDIV)|(SMOD))", get_keyword)]
 	#[regex("(?i)((NOT)|(AND)|(OR)|(XOR)|(SHL)|(SHR)|(SAR))", get_keyword)]
 	#[regex("(?i)((CMP)|(JG)|(JNG)|(JL)|(JNL)|(JE)|(JNE)|(JMP))", get_keyword)]
@@ -109,10 +147,10 @@ pub enum Token {
 	#[regex("\"(?:[^\"]|\\\\\")*\"")]
 	String,
 	
-	#[regex("([0-9][_0-9]*)")]
-	#[regex("(?i)(0x[0-9A-F][_0-9A-F]*)")]
-	#[regex("(?i)(0b[0-1][_0-1]*)")]
-	Number,
+	#[regex("([0-9][_0-9]*)", get_decimal_number)]
+	#[regex("(?i)(0x[0-9A-F][_0-9A-F]*)", get_hexadecimal_number)]
+	#[regex("(?i)(0b[0-1][_0-1]*)", get_binary_number)]
+	Number(u16),
 	
 	#[regex("[\\+-]")]
 	Operator,
@@ -121,7 +159,7 @@ pub enum Token {
 	Identifier,
 }
 
-pub fn token_display(stdout: &mut StandardStream, data: &str) {
+pub fn print_all(stdout: &mut StandardStream, data: &str) {
 	let mut lex = Token::lexer(&data);
 	
 	'lexing: loop {
@@ -132,7 +170,7 @@ pub fn token_display(stdout: &mut StandardStream, data: &str) {
 					break 'lexing;
 				}
 			};
-			
+				
 			let col = match token {
 				Token::Error		=> Color::Red,
 				Token::Whitespace	=> Color::Ansi256(8),
@@ -145,39 +183,23 @@ pub fn token_display(stdout: &mut StandardStream, data: &str) {
 				Token::CloseBracket	=> Color::Ansi256(166),
 				
 				Token::String		=> Color::Yellow,
-				Token::Number		=> Color::Ansi256(105),
+				Token::Number(_)	=> Color::Ansi256(105),
 				Token::Operator		=> Color::Ansi256(127),
 				Token::Identifier	=> Color::White,
 			};
 			stdout.set_color(ColorSpec::new().set_fg(Some(col))).unwrap();
 			
-			match token {Token::Keyword(_) => {write!(stdout, "\n").unwrap();} _ => ()}
-			write!(stdout, "{}\t", lex.slice()).unwrap();
+			write!(stdout, "{}\t", token_display(&lex, &token)).unwrap();
 		}
 		std::io::stdin().read_line(&mut "".to_owned()).unwrap();
 	}
 	stdout.set_color(ColorSpec::new().set_fg(Some(Color::White))).unwrap();
 }
 
-pub fn lex_for_parsing(data: &str) -> Vec<Token> {
-	let mut lex = Token::lexer(&data);
-	
-	let mut lexed = vec!();
-	
-	'lexing: loop {
-		let token = match lex.next() {
-			Some(token) => token,
-			None => {
-				break 'lexing;
-			}
-		};
-		
-		match token {
-			//Token::Comment|Token::Whitespace|Token::Separator => (),
-			Token::Error => {panic!("Unable to lex")}
-			_ => lexed.push(token),
-		};
-	}
-	
-	lexed
+pub fn token_display(lex: &Lexer<Token>, token: &Token) -> String {
+	let string = match token {
+		Token::Keyword(_) => "\n",
+		_ => ""
+	};
+	format!("{}{}", string, lex.slice())
 }

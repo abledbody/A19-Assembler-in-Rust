@@ -1,9 +1,11 @@
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub enum Keyword {
 	CONST,
 	MARK,
 	DATA,
+	DSTR,
 	
 	ADD,
 	SUB,
@@ -48,6 +50,7 @@ pub enum Keyword {
 	EXTI,
 }
 
+#[derive(Clone)]
 #[derive(Debug)]
 pub enum Register {
 	A,

@@ -9,4 +9,3 @@ edition = "2018"
 [dependencies]
 logos = "0.12.0"
 termcolor = "*"
-pest = "2.1.3"
