@@ -21,7 +21,8 @@ pub fn partially_encode(instruction: &Instruction, constants: &mut HashMap<Strin
 			constants.insert(name.to_owned(), byte_address);
 			vec!()
 		},
-		Instruction::DATA(data) => {
+		Instruction::DATA(data)
+		|Instruction::DSTR(data) => {
 			data.into_iter().map(|value| Byte::Definite(*value)).collect()
 		},
 		
@@ -82,9 +83,9 @@ pub fn encode_identifiers(constants: &HashMap<String, u16>, partially_encoded_fi
 			},
 			Byte::FromMemWithIdentifier(from_mem) => match from_mem {
 				FromMem::RegisterLiteral(reg, literal) => match literal {
-					Literal::Identifier(name) => {
+					Literal::Identifier(subtract, name) => {
 						let offset = match constants.get_key_value(name) {
-							Some((_, value)) => (*value),
+							Some((_, value)) => if *subtract {-(*value as i16) as u16} else {*value},
 							None => panic!("Invalid identifier: \"{}\"", name),
 						};
 						
@@ -92,14 +93,14 @@ pub fn encode_identifiers(constants: &HashMap<String, u16>, partially_encoded_fi
 					},
 					_ => panic!("Theoretically unreachable state."),
 				},
-				FromMem::TwoRegisterLiteral(lhs, subtract, rhs, literal) => match literal {
-					Literal::Identifier(name) => {
+				FromMem::TwoRegisterLiteral(lhs, reg_subtract, rhs, literal) => match literal {
+					Literal::Identifier(subtract, name) => {
 						let offset = match constants.get_key_value(name) {
-							Some((_, value)) => (*value),
+							Some((_, value)) => if *subtract {-(*value as i16) as u16} else {*value},
 							None => panic!("Invalid identifier: \"{}\"", name),
 						};
 						
-						encoded_file.push(encode_two_register_from_mem(&lhs, &rhs, *subtract) | offset << 8)
+						encoded_file.push(encode_two_register_from_mem(&lhs, &rhs, *reg_subtract) | offset << 8)
 					},
 					_ => panic!("Theoretically unreachable state."),
 				},
@@ -118,7 +119,7 @@ fn encode_one_op_instruction(base_op: u16, target: &Target) -> Vec<Byte> {
 		Target::Register(_) => (),
 		Target::Literal(literal) => match literal {
 			Literal::Number(value) => data.push(Byte::Definite(*value)),
-			Literal::Identifier(identifier) => data.push(Byte::Identifier(identifier.clone())),
+			Literal::Identifier(_, identifier) => data.push(Byte::Identifier(identifier.clone())),
 		},
 		Target::FromMem(from_mem) => data.push(from_mem_partial_encode(&from_mem)),
 	};
@@ -133,7 +134,7 @@ fn encode_two_op_instruction(base_op: u16, lhs: &Target, rhs: &Target) -> Vec<By
 		Target::Register(_) => (),
 		Target::Literal(literal) => match literal {
 			Literal::Number(value) => data.push(Byte::Definite(*value)),
-			Literal::Identifier(identifier) => data.push(Byte::Identifier(identifier.clone())),
+			Literal::Identifier(_, identifier) => data.push(Byte::Identifier(identifier.clone())),
 		},
 		Target::FromMem(from_mem) => data.push(from_mem_partial_encode(&from_mem)),
 	};
@@ -142,7 +143,7 @@ fn encode_two_op_instruction(base_op: u16, lhs: &Target, rhs: &Target) -> Vec<By
 		Target::Register(_) => (),
 		Target::Literal(literal) => match literal {
 			Literal::Number(value) => data.push(Byte::Definite(*value)),
-			Literal::Identifier(identifier) => data.push(Byte::Identifier(identifier.clone())),
+			Literal::Identifier(_, identifier) => data.push(Byte::Identifier(identifier.clone())),
 		},
 		Target::FromMem(_) => panic!("Encoding error: Second operand cannot be FromMem!")
 	};
@@ -179,7 +180,7 @@ fn from_mem_partial_encode(data: &FromMem) -> Byte {
 				let value = (*value as i16 % (1 << 12)) as u16;
 				Byte::Definite(register_offset(reg) | (value << 4))
 			}
-			Literal::Identifier(_) => Byte::FromMemWithIdentifier((*data).clone()),
+			Literal::Identifier(_,_) => Byte::FromMemWithIdentifier((*data).clone()),
 		}
 		FromMem::TwoRegister(left_reg, subtract, right_reg) => Byte::Definite(encode_two_register_from_mem(left_reg, right_reg, *subtract)),
 		FromMem::TwoRegisterLiteral(left_reg, subtract, right_reg, literal) => match literal {
@@ -187,7 +188,7 @@ fn from_mem_partial_encode(data: &FromMem) -> Byte {
 				let value = (*value as i16 % (1 << 8)) as u16;
 				Byte::Definite(encode_two_register_from_mem(left_reg, right_reg, *subtract) | (value << 8))
 			}
-			Literal::Identifier(_) => Byte::FromMemWithIdentifier((*data).clone()),
+			Literal::Identifier(_,_) => Byte::FromMemWithIdentifier((*data).clone()),
 		}
 	}
 }

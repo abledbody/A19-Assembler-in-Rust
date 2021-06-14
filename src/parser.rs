@@ -63,7 +63,7 @@ pub enum Target {
 #[derive(Debug)]
 pub enum Literal {
 	Number(u16),
-	Identifier(String),
+	Identifier(bool, String),
 }
 
 #[derive(Clone)]
@@ -297,7 +297,7 @@ fn get_next_operand(lex: &mut Lexer<Token>, secondary: bool) -> Target {
 						Err(token) => panic!("Malformed Operand: Expected Number after signage, got {:?}, {}", token, token_display(lex, &token)),
 					}
 				},
-				Token::Identifier => Target::Literal(Literal::Identifier(lex.slice().to_owned())),
+				Token::Identifier => Target::Literal(Literal::Identifier(false, lex.slice().to_owned())),
 				Token::Register(reg) => Target::Register(reg),
 				Token::OpenBracket => if secondary {
 					panic!("Syntax Error: Second operand can never be FromMem")
@@ -382,8 +382,15 @@ fn assemble_from_mem(lex: &mut Lexer<Token>) -> FromMem {
 		Some(token) => {
 			match token {
 				Token::Register(reg) => reg,
-				Token::Number(number) => {expect_close_bracket(lex); return FromMem::RegisterLiteral(first_register, Literal::Number(signed_number(first_offset_subtract, number)))},
-				Token::Identifier => {expect_close_bracket(lex); return FromMem::RegisterLiteral(first_register, Literal::Identifier(lex.slice().to_owned()))},
+				Token::Number(number) => {
+					expect_close_bracket(lex);
+					return FromMem::RegisterLiteral(first_register, Literal::Number(signed_number(first_offset_subtract, number)))
+				},
+				Token::Identifier => {
+					let from_mem = FromMem::RegisterLiteral(first_register, Literal::Identifier(first_offset_subtract, lex.slice().to_owned()));
+					expect_close_bracket(lex);
+					return from_mem;
+				},
 				_ => panic!("Malformed FromMem Operand: Expected Register, Number, or Identifier, found {:?}, {}", token, token_display(lex, &token))
 			}
 		},
@@ -414,7 +421,7 @@ fn assemble_from_mem(lex: &mut Lexer<Token>) -> FromMem {
 		Some(token) => {
 			match token {
 				Token::Number(number) => Literal::Number(signed_number(first_offset_subtract, number)),
-				Token::Identifier => Literal::Identifier(lex.slice().to_owned()),
+				Token::Identifier => Literal::Identifier(first_offset_subtract, lex.slice().to_owned()),
 				_ => panic!("Malformed FromMem Operand: Expected Number or Identifier, found {:?}, {}", token, token_display(lex, &token))
 			}
 		},

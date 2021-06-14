@@ -17,12 +17,13 @@ mod encoder;
 fn main() {
 	let args: Vec<String> = std::env::args().collect();
 	let path = Path::new(&args[1]);
-	//let path = "debug.a19";
+	let hold: bool = if args.len() > 2 {args[2].parse().unwrap()} else {false};
+	
 	let data = std::fs::read_to_string(path).unwrap();
 	
 	let mut stdout = StandardStream::stdout(ColorChoice::Always);
 	
-	lexer::print_all(&mut stdout, &data, false);
+	lexer::print_all(&mut stdout, &data, hold);
 	
 	let mut lex = Token::lexer(&data);
 	

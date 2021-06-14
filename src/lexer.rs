@@ -167,6 +167,7 @@ pub fn print_all(stdout: &mut StandardStream, data: &str, hold: bool) {
 			let token = match lex.next() {
 				Some(token) => token,
 				None => {
+					if hold {std::io::stdin().read_line(&mut "".to_owned()).unwrap();}
 					break 'lexing;
 				}
 			};
