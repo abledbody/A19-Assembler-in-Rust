@@ -147,9 +147,9 @@ pub enum Token {
 	#[regex("\"(?:[^\"]|\\\\\")*\"")]
 	String,
 	
-	#[regex("([0-9][_0-9]*)", get_decimal_number)]
 	#[regex("(?i)(0x[0-9A-F][_0-9A-F]*)", get_hexadecimal_number)]
-	#[regex("(?i)(0b[0-1][_0-1]*)", get_binary_number)]
+	#[regex("(?i)(0b[01][_01]*)", get_binary_number)]
+	#[regex("([0-9][_0-9]*)", get_decimal_number)]
 	Number(u16),
 	
 	#[regex("[\\+-]")]
